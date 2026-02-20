@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Cyber Secure Login</title>
+<style>
+body {
+  background:black;
+  color:#00ffcc;
+  font-family:Courier New;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+.box {
+  border:1px solid #00ffcc;
+  padding:40px;
+  box-shadow:0 0 30px #00ffcc;
+  text-align:center;
+}
+input {
+  display:block;
+  margin:10px 0;
+  padding:10px;
+  background:black;
+  border:1px solid #00ffcc;
+  color:#00ffcc;
+}
+button {
+  padding:10px;
+  background:#00ffcc;
+  border:none;
+  cursor:pointer;
+}
+.glow {
+  animation: glow 1.5s infinite alternate;
+}
+@keyframes glow {
+  from { text-shadow:0 0 5px #00ffcc; }
+  to { text-shadow:0 0 20px #00ffcc; }
+}
+</style>
+</head>
+<body>
+<div class="box">
+<h2 class="glow">ENTER SOC TERMINAL</h2>
+<input placeholder="Username">
+<input type="password" placeholder="Password">
+<button onclick="login()">Access Dashboard</button>
+</div>
+
+<script>
+function login(){
+    window.location.href="index.html";
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ENTERPRISE SOAR | Cyber Defense Console</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+
+<style>
+body {
+    margin:0;
+    font-family: 'Courier New', monospace;
+    background: radial-gradient(circle at top, #0f2027, #000000);
+    color:#00ffcc;
+}
+
+header {
+    padding:20px;
+    text-align:center;
+    font-size:26px;
+    text-shadow:0 0 15px #00ffcc;
+    border-bottom:1px solid #00ffcc;
+}
+
+.container {
+    display:grid;
+    grid-template-columns: 1fr 2fr;
+    gap:20px;
+    padding:20px;
+}
+
+.card {
+    background:#111;
+    border:1px solid #00ffcc;
+    padding:15px;
+    box-shadow:0 0 20px #00ffcc22;
+    border-radius:8px;
+}
+
+input {
+    width:100%;
+    padding:8px;
+    margin-bottom:10px;
+    background:#000;
+    border:1px solid #00ffcc;
+    color:#00ffcc;
+}
+
+button {
+    width:100%;
+    padding:10px;
+    background:#00ffcc;
+    border:none;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+button:hover {
+    background:#00ffaa;
+    box-shadow:0 0 20px #00ffcc;
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+}
+
+th, td {
+    border-bottom:1px solid #00ffcc33;
+    padding:8px;
+}
+
+.severity-Low { color:#00ff00; }
+.severity-Medium { color:#ffff00; }
+.severity-High { color:#ff8800; }
+.severity-Critical { 
+    color:#ff0033; 
+    font-weight:bold;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    50% { opacity:0.4; }
+}
+
+.terminal {
+    background:#000;
+    height:150px;
+    overflow-y:auto;
+    padding:10px;
+    font-size:12px;
+    border:1px solid #00ffcc;
+}
+
+#map {
+    height:250px;
+    margin-top:10px;
+}
+
+.ai-box {
+    font-size:32px;
+    text-align:center;
+    margin-top:10px;
+    color:red;
+}
+
+.counter {
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+🛡 ENTERPRISE SOAR v3 — LIVE SOC COMMAND CENTER
+<div id="clock"></div>
+</header>
+
+<div class="container">
+
+<!-- LEFT PANEL -->
+<div class="card">
+
+<h3>🚨 Submit Security Alert</h3>
+<input id="ip" placeholder="Source IP">
+<input id="user" placeholder="Username">
+<input id="desc" placeholder="Description">
+<button onclick="createIncident()">DEPLOY ANALYSIS</button>
+
+<h3>📡 Live Event Log</h3>
+<div class="terminal" id="terminal"></div>
+
+<h3>🧠 AI Threat Score</h3>
+<div class="ai-box" id="aiScore">0%</div>
+
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="card">
+
+<div class="counter">
+<span>Total Incidents: <span id="totalCount">0</span></span>
+<span>Critical: <span id="criticalCount">0</span></span>
+</div>
+
+<h3>📊 Threat Analytics</h3>
+<table id="table"></table>
+<br>
+<canvas id="chart"></canvas>
+
+<h3>🌍 Global Threat Map</h3>
+<div id="map"></div>
+
+</div>
+
+</div>
+
+<audio id="alertSound">
+<source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">
+</audio>
+
+<script>
+let chartInstance;
+const socket = io("http://localhost:5000");
+
+// 🌍 Initialize Map
+const map = L.map('map').setView([20,0],2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+.addTo(map);
+
+// 🧑‍💻 Hacker typing effect
+function hackerType(text){
+    const terminal=document.getElementById("terminal");
+    let i=0;
+    const typing=setInterval(()=>{
+        terminal.innerHTML += text[i];
+        i++;
+        if(i>=text.length){
+            terminal.innerHTML += "<br>";
+            clearInterval(typing);
+        }
+    },15);
+}
+
+// 🔊 Sound alert
+function playAlert(){
+    document.getElementById("alertSound").play();
+}
+
+// 🧠 AI score animation
+function animateAIScore(score){
+    let current=0;
+    const interval=setInterval(()=>{
+        current++;
+        document.getElementById("aiScore").innerText=current+"%";
+        if(current>=score) clearInterval(interval);
+    },15);
+}
+
+// 🌍 Plot Threat
+function plotThreat(severity){
+    const color = severity==="Critical"?"red":
+                  severity==="High"?"orange":
+                  severity==="Medium"?"yellow":"green";
+
+    L.circleMarker(
+        [Math.random()*140-70, Math.random()*360-180],
+        {radius:8,color:color}
+    ).addTo(map);
+}
+
+// ⚡ Real-time WebSocket
+socket.on("newIncident",(incident)=>{
+    hackerType("⚠ Threat Detected: "+incident.sourceIP);
+    animateAIScore(incident.combinedScore);
+    plotThreat(incident.severity);
+    if(incident.severity==="Critical") playAlert();
+    loadIncidents();
+});
+
+// 🚨 Submit Alert
+async function createIncident(){
+    await fetch("http://localhost:5000/api/alerts",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            sourceIP:ip.value,
+            user:user.value,
+            description:desc.value
+        })
+    });
+}
+
+// 📊 Load Incidents
+async function loadIncidents(){
+    const res=await fetch("http://localhost:5000/api/alerts");
+    const data=await res.json();
+
+    let html="<tr><th>IP</th><th>User</th><th>Severity</th><th>Score</th></tr>";
+    let counts={Low:0,Medium:0,High:0,Critical:0};
+
+    data.forEach(i=>{
+        html+=`<tr>
+        <td>${i.sourceIP}</td>
+        <td>${i.user}</td>
+        <td class="severity-${i.severity}">${i.severity}</td>
+        <td>${i.combinedScore}</td>
+        </tr>`;
+        counts[i.severity]++;
+    });
+
+    document.getElementById("table").innerHTML=html;
+
+    document.getElementById("totalCount").innerText=data.length;
+    document.getElementById("criticalCount").innerText=counts.Critical;
+
+    renderChart(counts);
+}
+
+function renderChart(counts){
+    if(chartInstance) chartInstance.destroy();
+    chartInstance=new Chart(document.getElementById("chart"),{
+        type:"doughnut",
+        data:{
+            labels:Object.keys(counts),
+            datasets:[{data:Object.values(counts)}]
+        },
+        options:{
+            plugins:{legend:{labels:{color:"#00ffcc"}}}
+        }
+    });
+}
+
+function updateClock(){
+    document.getElementById("clock").innerText=
+    new Date().toLocaleString();
+}
+setInterval(updateClock,1000);
+
+hackerType("Initializing AI Threat Engine...");
+loadIncidents();
+updateClock();
+</script>
+
+</body>
+</html>
